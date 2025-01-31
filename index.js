@@ -1,7 +1,7 @@
 require('dotenv').config()
 const express = require('express')
 const app = express()
-const port = 3000
+const port = 3009
 
 const bodyParser = require('body-parser')
 const hubspot = require('@hubspot/api-client')
@@ -14,6 +14,10 @@ const hubspotCli = new hubspot.Client({
   accessToken: process.env.HUBSPOT_PRIVATE_KEY,
   checkLimit: true // (Optional) Specify whether to check the API limit on each call. Default: true
 })
+
+app.get('/', async (req, res) => {
+  return res.status(200).json({ message: "Healthy" });
+});
 
 app.post('/register', async (req, res) => {
   let data = []
