@@ -16,59 +16,79 @@ const hubspotCli = new hubspot.Client({
 })
 
 app.get('/', async (req, res) => {
-  return res.status(200).json({ message: "Healthy" });
+  try {
+    return res.status(200).json({ message: "Healthy" });
+  } catch (error) {
+    console.error('Error in / route:', error);
+    return res.status(500).json({ error: 'Internal Server Error' });
+  }
 });
 
 app.post('/register', async (req, res) => {
-  let data = []
+  try {
+    let data = []
 
-  if ((req.body).__proto__.constructor.name == 'Object') {
-    data = [req.body]
-  } else {
-    data = req.body
-  }
-
-  let results = []
-
-  for await (const item of data) {
-    const contactObject = await hubspotCli.crm.contacts.basicApi.getById(item.objectId, ['hs_object_id', 'partner_id'])
-    const partnerSearch = await hubspotCli.crm.objects.searchApi.doSearch('2-11190825', {
-      // query: `partner_id=${contactObject.properties.partner_id}`,
-      "filterGroups": [
-        {
-          "filters": [
-            {
-              "propertyName": "partner_id",
-              "operator": "EQ",
-              "value": contactObject.properties.partner_id
-            }
-          ]
-        }
-      ],
-      properties: ['hs_object_id']
-    })
-    if (partnerSearch.results.length > 0) {
-      const partnerObject = partnerSearch.results[0]
-      const result = await axios.post(process.env.WORKFLOW_ENDPOINT, {
-        partner: Number(partnerObject.properties.hs_object_id),
-        contact: Number(contactObject.properties.hs_object_id)
-      })
-      results.push(result.data)
+    if ((req.body).__proto__.constructor.name == 'Object') {
+      data = [req.body]
+    } else {
+      data = req.body
     }
-  }
 
-  res.send({
-    sent: true,
-    results
-  })
+    let results = []
+
+    for (const item of data) {
+      try {
+        const contactObject = await hubspotCli.crm.contacts.basicApi.getById(item.objectId, ['hs_object_id', 'partner_id'])
+        
+        const partnerSearch = await hubspotCli.crm.objects.searchApi.doSearch('2-11190825', {
+          "filterGroups": [
+            {
+              "filters": [
+                {
+                  "propertyName": "partner_id",
+                  "operator": "EQ",
+                  "value": contactObject.properties.partner_id
+                }
+              ]
+            }
+          ],
+          properties: ['hs_object_id']
+        })
+        
+        if (partnerSearch.results.length > 0) {
+          const partnerObject = partnerSearch.results[0]
+          const result = await axios.post(process.env.WORKFLOW_ENDPOINT, {
+            partner: Number(partnerObject.properties.hs_object_id),
+            contact: Number(contactObject.properties.hs_object_id)
+          })
+          results.push(result.data)
+        }
+      } catch (err) {
+        console.error('Error processing item:', err);
+        results.push({ error: 'Failed to process item', details: err.message });
+      }
+    }
+
+    res.send({
+      sent: true,
+      results
+    });
+  } catch (err) {
+    console.error('Error in /register route:', err);
+    res.status(500).send({ error: 'Internal Server Error' });
+  }
 })
 
 app.post('/hook', async (req, res) => {
-  console.log(req.body)
-
-  res.send({
-    ok: true
-  })
+  try {
+    console.log(req.body)
+    res.send({
+      ok: true
+    })
+  } catch (error) {
+    console.error('Error in /hook route:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
 })
 
 app.listen(port, () => {
